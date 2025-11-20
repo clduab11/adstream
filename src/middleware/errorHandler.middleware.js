@@ -117,7 +117,7 @@ function errorHandler(err, req, res, _next) {
   // Default error response
   const isDevelopment = process.env.NODE_ENV !== 'production';
   const exposeErrors = process.env.EXPOSE_ERRORS === 'true';
-  const shouldExposeStack = isDevelopment && exposeErrors;
+  const shouldExposeStack = isDevelopment || exposeErrors;
 
   res.status(500).json({
     error: API_ERRORS.INTERNAL_ERROR.code,
