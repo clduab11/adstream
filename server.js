@@ -110,8 +110,8 @@ const server = app.listen(PORT, () => {
   ║   Server running on port ${portStr.padEnd(19)}║
   ║   Environment: ${envStr.padEnd(28)}║
   ║                                               ║
-  ║   API Docs: http://localhost:${portStr}/api/v1${' '.repeat(13 - portStr.length)}║
-  ║   Health:   http://localhost:${portStr}/health${' '.repeat(15 - portStr.length)}║
+  ║   API Docs: http://localhost:${portStr}/api/v1${' '.repeat(Math.max(0, 13 - portStr.length))}║
+  ║   Health:   http://localhost:${portStr}/health${' '.repeat(Math.max(0, 15 - portStr.length))}║
   ║                                               ║
   ╚═══════════════════════════════════════════════╝
   `);
