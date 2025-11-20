@@ -65,7 +65,8 @@ class CampaignModel {
     const now = new Date().toISOString();
 
     // Sanitize segment to prevent SQL injection through LIKE wildcards
-    const sanitizedSegment = segment.replace(/[%_]/g, '\\$&');
+    // Escape backslashes first, then escape % and _
+    const sanitizedSegment = segment.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
 
     const sql = `
       SELECT * FROM campaigns
