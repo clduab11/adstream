@@ -53,8 +53,8 @@ const logger = winston.createLogger({
   transports
 });
 
-// Create child logger for specific modules
-logger.child = (metadata) => {
+// Create child logger for specific modules (renamed to avoid shadowing Winston's built-in method)
+logger.createChildLogger = (metadata) => {
   return winston.createLogger({
     level: logLevel,
     defaultMeta: metadata,

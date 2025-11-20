@@ -1,6 +1,5 @@
 const CampaignModel = require('../models/campaign.model');
 const TrackingModel = require('../models/tracking.model');
-const SegmentationService = require('./segmentation.service');
 const { DEFAULT_HOUSE_AD, PERFORMANCE } = require('../config/constants');
 
 /**

@@ -7,7 +7,7 @@
 
 require('dotenv').config();
 
-const { initDatabase, getDatabase, getDbType } = require('../src/config/database');
+const { initDatabase, getDbType } = require('../src/config/database');
 
 const migrations = [
   {
@@ -57,8 +57,8 @@ const migrations = [
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         device_type TEXT DEFAULT 'desktop',
         placement TEXT DEFAULT 'homepage_banner',
-        FOREIGN KEY (campaign_id) REFERENCES campaigns(campaign_id),
-        FOREIGN KEY (user_id) REFERENCES users(user_id)
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(campaign_id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
       )
     `,
     down: 'DROP TABLE IF EXISTS impressions'
@@ -73,9 +73,9 @@ const migrations = [
         user_id TEXT NOT NULL,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         redirect_url TEXT,
-        FOREIGN KEY (impression_id) REFERENCES impressions(impression_id),
-        FOREIGN KEY (campaign_id) REFERENCES campaigns(campaign_id),
-        FOREIGN KEY (user_id) REFERENCES users(user_id)
+        FOREIGN KEY (impression_id) REFERENCES impressions(impression_id) ON DELETE CASCADE,
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(campaign_id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
       )
     `,
     down: 'DROP TABLE IF EXISTS clicks'

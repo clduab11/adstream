@@ -99,16 +99,19 @@ const server = app.listen(PORT, () => {
     db_type: process.env.DB_TYPE || 'sqlite'
   });
 
+  const portStr = String(PORT);
+  const envStr = (process.env.NODE_ENV || 'development');
+  
   console.log(`
   ╔═══════════════════════════════════════════════╗
   ║                                               ║
   ║   ADSTREAM - Retail Media Network Server      ║
   ║                                               ║
-  ║   Server running on port ${PORT}                ║
-  ║   Environment: ${(process.env.NODE_ENV || 'development').padEnd(28)}║
+  ║   Server running on port ${portStr.padEnd(19)}║
+  ║   Environment: ${envStr.padEnd(28)}║
   ║                                               ║
-  ║   API Docs: http://localhost:${PORT}/api/v1      ║
-  ║   Health:   http://localhost:${PORT}/health      ║
+  ║   API Docs: http://localhost:${portStr}/api/v1${' '.repeat(13 - portStr.length)}║
+  ║   Health:   http://localhost:${portStr}/health${' '.repeat(15 - portStr.length)}║
   ║                                               ║
   ╚═══════════════════════════════════════════════╝
   `);

@@ -59,13 +59,14 @@ class SegmentationService {
    * Update all user segments based on current data
    */
   static async recalculateAllSegments() {
-    const users = query('SELECT * FROM users');
+    const result = await query('SELECT * FROM users');
+    const users = result.rows || result;
     let updated = 0;
 
     for (const user of users) {
       const newSegment = this.calculateSegment(user);
       if (newSegment !== user.segment) {
-        query(
+        await query(
           'UPDATE users SET segment = $1 WHERE user_id = $2',
           [newSegment, user.user_id]
         );

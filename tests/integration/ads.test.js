@@ -3,10 +3,10 @@ const app = require('../../server');
 const { initDatabase, closeDatabase } = require('../../src/config/database');
 
 describe('Ads API Integration Tests', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     process.env.DB_TYPE = 'sqlite';
     process.env.SQLITE_DB_PATH = ':memory:';
-    initDatabase();
+    await initDatabase();
 
     // Run migrations inline for tests
     const db = require('../../src/config/database').getDatabase();

@@ -7,7 +7,7 @@
 
 require('dotenv').config();
 
-const { initDatabase, getDatabase } = require('../src/config/database');
+const { initDatabase } = require('../src/config/database');
 const UserModel = require('../src/models/user.model');
 const CampaignModel = require('../src/models/campaign.model');
 const TrackingModel = require('../src/models/tracking.model');
@@ -124,7 +124,7 @@ async function seedCampaigns() {
       target_segments: targetSegments,
       ad_creative_url: creativeUrls[i % creativeUrls.length],
       redirect_url: `https://${advertisers[i % advertisers.length].toLowerCase().replace(/\s+/g, '')}.com/promo`,
-      bid_amount: randomInt(1, 10) + Math.random().toFixed(2) * 1,
+      bid_amount: randomInt(100, 1099) / 100,
       budget_total: budget,
       budget_remaining: budget * (0.5 + Math.random() * 0.5),
       start_date: thirtyDaysAgo.toISOString(),
@@ -144,8 +144,6 @@ async function seedImpressions(users, campaigns) {
   console.log(`\nSeeding ${NUM_IMPRESSIONS} impressions...`);
 
   const impressions = [];
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const activeCampaigns = campaigns.filter(c => c.status === 'active');
 

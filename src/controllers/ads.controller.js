@@ -4,7 +4,7 @@ const TrackingModel = require('../models/tracking.model');
 const BiddingService = require('../services/bidding.service');
 const FraudDetectionService = require('../services/fraud-detection.service');
 const { generateImpressionId } = require('../utils/crypto');
-const { DEFAULT_HOUSE_AD, PERFORMANCE, API_ERRORS } = require('../config/constants');
+const { DEFAULT_HOUSE_AD, PERFORMANCE } = require('../config/constants');
 const { ApiError } = require('../middleware/errorHandler.middleware');
 const logger = require('../utils/logger');
 
@@ -20,7 +20,7 @@ class AdsController {
     const startTime = Date.now();
 
     try {
-      const { user_id, placement, device_type, context } = req.body;
+      const { user_id, placement, device_type } = req.body;
 
       // Validate required fields
       if (!user_id) {
