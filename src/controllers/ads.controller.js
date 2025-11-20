@@ -28,11 +28,11 @@ class AdsController {
       }
 
       // Get user profile
-      let user = UserModel.findById(user_id);
+      let user = await UserModel.findById(user_id);
 
       // Create user if not found (for demo purposes)
       if (!user) {
-        user = UserModel.create({
+        user = await UserModel.create({
           user_id,
           username: `user_${user_id}`,
           segment: 'new_customers'
@@ -40,7 +40,7 @@ class AdsController {
       }
 
       // Select winning campaign using bidding service
-      const bidResult = BiddingService.selectWinningCampaign(
+      const bidResult = await BiddingService.selectWinningCampaign(
         user,
         placement || 'homepage_banner',
         device_type || 'desktop'
@@ -75,7 +75,7 @@ class AdsController {
         impressionId = generateImpressionId();
 
         // Record impression
-        TrackingModel.createImpression({
+        await TrackingModel.createImpression({
           impression_id: impressionId,
           campaign_id: bidResult.campaign.campaign_id,
           user_id: user.user_id,
@@ -87,7 +87,7 @@ class AdsController {
         FraudDetectionService.cacheImpression(impressionId);
 
         // Process bid deduction
-        BiddingService.processBidDeduction(
+        await BiddingService.processBidDeduction(
           bidResult.campaign.campaign_id,
           bidResult.bid_price
         );
@@ -147,7 +147,7 @@ class AdsController {
       }
 
       // Check if impression exists in database
-      if (!TrackingModel.impressionExists(impression_id)) {
+      if (!(await TrackingModel.impressionExists(impression_id))) {
         return res.status(404).json({
           error: 'IMPRESSION_NOT_FOUND',
           message: 'Impression does not exist'
@@ -190,10 +190,10 @@ class AdsController {
       const impression = validation.impression;
 
       // Get campaign for redirect URL
-      const campaign = CampaignModel.findById(impression.campaign_id);
+      const campaign = await CampaignModel.findById(impression.campaign_id);
 
       // Record click
-      const clickResult = TrackingModel.createClick({
+      const clickResult = await TrackingModel.createClick({
         impression_id,
         campaign_id: impression.campaign_id,
         user_id: impression.user_id,
@@ -227,7 +227,7 @@ class AdsController {
     try {
       const { campaign_id } = req.params;
 
-      const campaign = CampaignModel.findById(campaign_id);
+      const campaign = await CampaignModel.findById(campaign_id);
 
       if (!campaign) {
         throw new ApiError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign does not exist');

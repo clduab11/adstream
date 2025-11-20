@@ -10,9 +10,9 @@ class BiddingService {
    * Select the winning campaign for an ad request
    * Uses simplified second-price auction model
    */
-  static selectWinningCampaign(user, placement, deviceType) {
+  static async selectWinningCampaign(user, placement, deviceType) {
     // Get all active campaigns targeting user's segment
-    const eligibleCampaigns = this.getEligibleCampaigns(user, placement);
+    const eligibleCampaigns = await this.getEligibleCampaigns(user, placement);
 
     if (eligibleCampaigns.length === 0) {
       return {
@@ -23,9 +23,9 @@ class BiddingService {
     }
 
     // Calculate effective CPM for each campaign
-    const scoredCampaigns = eligibleCampaigns.map(campaign => {
+    const scoredCampaigns = await Promise.all(eligibleCampaigns.map(async campaign => {
       const eCPM = this.calculateEffectiveCPM(campaign, user.segment);
-      const qualityScore = this.getQualityScore(campaign);
+      const qualityScore = await this.getQualityScore(campaign);
 
       return {
         campaign,
@@ -33,7 +33,7 @@ class BiddingService {
         qualityScore,
         finalScore: eCPM * qualityScore
       };
-    });
+    }));
 
     // Sort by final score (descending)
     scoredCampaigns.sort((a, b) => b.finalScore - a.finalScore);
@@ -55,20 +55,43 @@ class BiddingService {
 
   /**
    * Get campaigns eligible for the current request
+   * Fixed N+1 query by fetching all impression counts in a single query
    */
-  static getEligibleCampaigns(user, placement) {
+  static async getEligibleCampaigns(user, placement) {
     // Get active campaigns for user's segment
-    const campaigns = CampaignModel.findActiveBySegment(user.segment);
+    const campaigns = await CampaignModel.findActiveBySegment(user.segment);
+
+    if (campaigns.length === 0) {
+      return [];
+    }
+
+    // Fetch all impression counts in a single query to avoid N+1
+    const cutoffTime = new Date(Date.now() - PERFORMANCE.MAX_FREQUENCY_CAP_HOURS * 60 * 60 * 1000).toISOString();
+    const { query } = require('../config/database');
+    
+    const campaignIds = campaigns.map(c => c.campaign_id);
+    const placeholders = campaignIds.map((_, i) => `$${i + 2}`).join(', ');
+    
+    const impressionCountsResult = await query(
+      `SELECT campaign_id, COUNT(*) as count
+       FROM impressions
+       WHERE user_id = $1
+       AND campaign_id IN (${placeholders})
+       AND timestamp >= $${campaignIds.length + 2}
+       GROUP BY campaign_id`,
+      [user.user_id, ...campaignIds, cutoffTime]
+    );
+
+    const impressionCounts = new Map();
+    const rows = impressionCountsResult.rows || impressionCountsResult;
+    rows.forEach(row => {
+      impressionCounts.set(row.campaign_id, Number(row.count));
+    });
 
     // Filter by frequency cap and other criteria
     return campaigns.filter(campaign => {
-      // Check frequency cap
-      const impressionCount = TrackingModel.getUserImpressionCount(
-        user.user_id,
-        campaign.campaign_id,
-        PERFORMANCE.MAX_FREQUENCY_CAP_HOURS
-      );
-
+      // Check frequency cap using the fetched counts
+      const impressionCount = impressionCounts.get(campaign.campaign_id) || 0;
       const frequencyCap = campaign.frequency_cap || PERFORMANCE.DEFAULT_FREQUENCY_CAP;
 
       if (impressionCount >= frequencyCap) {
@@ -103,9 +126,9 @@ class BiddingService {
   /**
    * Get quality score for a campaign based on historical CTR
    */
-  static getQualityScore(campaign) {
+  static async getQualityScore(campaign) {
     // Get campaign metrics
-    const stats = CampaignModel.getStats(campaign.campaign_id);
+    const stats = await CampaignModel.getStats(campaign.campaign_id);
 
     if (!stats || stats.impressions < 100) {
       // Not enough data, use default score
@@ -125,7 +148,7 @@ class BiddingService {
   /**
    * Process bid deduction after impression is served
    */
-  static processBidDeduction(campaignId, bidPrice) {
+  static async processBidDeduction(campaignId, bidPrice) {
     // Convert CPM to per-impression cost
     const impressionCost = bidPrice / 1000;
 
@@ -135,16 +158,16 @@ class BiddingService {
   /**
    * Get bid landscape for reporting
    */
-  static getBidLandscape(segment) {
-    const campaigns = CampaignModel.findActiveBySegment(segment);
+  static async getBidLandscape(segment) {
+    const campaigns = await CampaignModel.findActiveBySegment(segment);
 
-    return campaigns.map(campaign => ({
+    return Promise.all(campaigns.map(async campaign => ({
       campaign_id: campaign.campaign_id,
       advertiser: campaign.advertiser_name,
       bid_amount: campaign.bid_amount,
-      quality_score: this.getQualityScore(campaign),
+      quality_score: await this.getQualityScore(campaign),
       budget_remaining: campaign.budget_remaining
-    })).sort((a, b) => b.bid_amount - a.bid_amount);
+    }))).then(results => results.sort((a, b) => b.bid_amount - a.bid_amount));
   }
 
   /**
