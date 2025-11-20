@@ -161,13 +161,15 @@ class BiddingService {
   static async getBidLandscape(segment) {
     const campaigns = await CampaignModel.findActiveBySegment(segment);
 
-    return Promise.all(campaigns.map(async campaign => ({
+    const results = await Promise.all(campaigns.map(async campaign => ({
       campaign_id: campaign.campaign_id,
       advertiser: campaign.advertiser_name,
       bid_amount: campaign.bid_amount,
       quality_score: await this.getQualityScore(campaign),
       budget_remaining: campaign.budget_remaining
-    }))).then(results => results.sort((a, b) => b.bid_amount - a.bid_amount));
+    })));
+    
+    return results.sort((a, b) => b.bid_amount - a.bid_amount);
   }
 
   /**

@@ -60,8 +60,8 @@ function verifyImpressionId(impressionId) {
     return false;
   }
 
-  // Signature length check
-  if (providedSignature.length !== 8) {
+  // Signature length and format check (must be valid hex)
+  if (providedSignature.length !== 8 || !/^[0-9a-f]{8}$/i.test(providedSignature)) {
     return false;
   }
 

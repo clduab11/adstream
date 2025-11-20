@@ -6,10 +6,11 @@ let dbType = process.env.DB_TYPE || 'sqlite';
 
 /**
  * Initialize database connection based on environment configuration
+ * Returns a Promise for consistency across database types
  */
-function initDatabase() {
+async function initDatabase() {
   if (db) {
-    return db;
+    return Promise.resolve(db);
   }
 
   if (dbType === 'sqlite') {
@@ -34,7 +35,7 @@ function initDatabase() {
       });
     }
 
-    return db;
+    return Promise.resolve(db);
   } else if (dbType === 'postgres') {
     const { Pool } = require('pg');
 
@@ -44,7 +45,13 @@ function initDatabase() {
       max: parseInt(process.env.DB_POOL_MAX) || 20
     });
 
-    return db;
+    // Test connection for PostgreSQL
+    try {
+      await db.query('SELECT 1');
+      return db;
+    } catch (error) {
+      throw new Error(`Failed to connect to PostgreSQL: ${error.message}`);
+    }
   }
 
   throw new Error(`Unsupported database type: ${dbType}`);

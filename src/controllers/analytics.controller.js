@@ -83,6 +83,19 @@ class AnalyticsController {
     try {
       const { offset = 0, limit = 50, status } = req.query;
 
+      // Get total count for pagination (with status filter if specified)
+      const { query } = require('../config/database');
+      let countSql = 'SELECT COUNT(*) as total FROM campaigns';
+      const countParams = [];
+      
+      if (status) {
+        countSql += ' WHERE status = $1';
+        countParams.push(status);
+      }
+      
+      const countResult = await query(countSql, countParams);
+      const total = countResult.rows ? countResult.rows[0].total : countResult[0].total;
+
       let campaigns = await CampaignModel.findAll(
         parseInt(offset),
         parseInt(limit)
@@ -107,11 +120,6 @@ class AnalyticsController {
           };
         })
       );
-
-      // Get total count for pagination
-      const { query } = require('../config/database');
-      const countResult = await query('SELECT COUNT(*) as total FROM campaigns');
-      const total = countResult.rows ? countResult.rows[0].total : countResult[0].total;
 
       res.json({
         campaigns: campaignsWithStats,

@@ -75,9 +75,9 @@ class CampaignModel {
         AND start_date <= $2
         AND end_date >= $2
         AND (
-          target_segments LIKE $3
-          OR target_segments LIKE $4
-          OR target_segments LIKE $5
+          target_segments LIKE $3 ESCAPE '\\'
+          OR target_segments LIKE $4 ESCAPE '\\'
+          OR target_segments LIKE $5 ESCAPE '\\'
         )
       ORDER BY bid_amount DESC
     `;

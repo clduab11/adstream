@@ -2,7 +2,12 @@ const { API_ERRORS } = require('../config/constants');
 const logger = require('../utils/logger');
 const { hashApiKey } = require('../utils/crypto');
 
-// Get API keys from environment variables
+/**
+ * Get API keys from environment variables
+ * Note: This is called at module load time, so API keys are loaded once at startup.
+ * To reload keys from environment variables without restarting, use reloadApiKeys().
+ * In production, API_KEYS environment variable must be set or startup will fail.
+ */
 const getValidApiKeys = () => {
   const keys = new Set();
   
@@ -28,8 +33,17 @@ const getValidApiKeys = () => {
   return keys;
 };
 
-// Initialize valid API keys
-const validApiKeys = getValidApiKeys();
+// Initialize valid API keys at module load time
+let validApiKeys = getValidApiKeys();
+
+/**
+ * Reload API keys from environment variables
+ * Useful for runtime configuration updates without server restart
+ */
+function reloadApiKeys() {
+  validApiKeys = getValidApiKeys();
+  return validApiKeys.size;
+}
 
 /**
  * Authentication middleware
@@ -101,5 +115,6 @@ module.exports = {
   authMiddleware,
   addApiKey,
   removeApiKey,
-  isValidApiKey
+  isValidApiKey,
+  reloadApiKeys
 };
