@@ -176,7 +176,11 @@ class AnalyticsController {
 
       // Validate required fields
       if (!advertiser_name || !ad_creative_url || !bid_amount || !budget_remaining) {
-        throw new ApiError(400, 'MISSING_FIELDS', 'Required fields: advertiser_name, ad_creative_url, bid_amount, budget_remaining');
+        throw new ApiError(
+          400,
+          'MISSING_FIELDS',
+          'Required fields: advertiser_name, ad_creative_url, bid_amount, budget_remaining'
+        );
       }
 
       const campaign = await CampaignModel.create({
@@ -230,7 +234,7 @@ class AnalyticsController {
     try {
       const { min_size = 0 } = req.query;
 
-      const segments = SegmentationService.getAvailableSegments(parseInt(min_size));
+      const segments = await SegmentationService.getAvailableSegments(parseInt(min_size));
 
       res.json({
         segments,

@@ -8,7 +8,9 @@ let dbType = process.env.DB_TYPE || 'sqlite';
  * Initialize database connection based on environment configuration
  */
 function initDatabase() {
-  if (db) return db;
+  if (db) {
+    return db;
+  }
 
   if (dbType === 'sqlite') {
     const Database = require('better-sqlite3');
@@ -39,7 +41,7 @@ function initDatabase() {
     db = new Pool({
       connectionString: process.env.DATABASE_URL,
       min: parseInt(process.env.DB_POOL_MIN) || 5,
-      max: parseInt(process.env.DB_POOL_MAX) || 20,
+      max: parseInt(process.env.DB_POOL_MAX) || 20
     });
 
     return db;
@@ -130,7 +132,9 @@ function transaction(callback) {
           return client.query('COMMIT').then(() => result);
         })
         .catch(err => {
-          return client.query('ROLLBACK').then(() => { throw err; });
+          return client.query('ROLLBACK').then(() => {
+            throw err;
+          });
         })
         .finally(() => client.release());
     });

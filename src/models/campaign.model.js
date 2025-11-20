@@ -204,13 +204,13 @@ class CampaignModel {
       LEFT JOIN (
         SELECT campaign_id, COUNT(*) as click_count
         FROM clicks
-        WHERE campaign_id = $1
+        WHERE campaign_id = $2
         GROUP BY campaign_id
       ) clk ON c.campaign_id = clk.campaign_id
-      WHERE c.campaign_id = $1
+      WHERE c.campaign_id = $3
     `;
 
-    return queryOne(sql, [campaignId]);
+    return queryOne(sql, [campaignId, campaignId, campaignId]);
   }
 
   /**

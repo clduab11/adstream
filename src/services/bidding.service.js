@@ -1,5 +1,4 @@
 const CampaignModel = require('../models/campaign.model');
-const TrackingModel = require('../models/tracking.model');
 const { DEFAULT_HOUSE_AD, PERFORMANCE } = require('../config/constants');
 
 /**
@@ -10,7 +9,7 @@ class BiddingService {
    * Select the winning campaign for an ad request
    * Uses simplified second-price auction model
    */
-  static async selectWinningCampaign(user, placement, deviceType) {
+  static async selectWinningCampaign(user, placement, _deviceType) {
     // Get all active campaigns targeting user's segment
     const eligibleCampaigns = await this.getEligibleCampaigns(user, placement);
 
@@ -57,7 +56,7 @@ class BiddingService {
    * Get campaigns eligible for the current request
    * Fixed N+1 query by fetching all impression counts in a single query
    */
-  static async getEligibleCampaigns(user, placement) {
+  static async getEligibleCampaigns(user, _placement) {
     // Get active campaigns for user's segment
     const campaigns = await CampaignModel.findActiveBySegment(user.segment);
 
@@ -71,13 +70,14 @@ class BiddingService {
     
     const campaignIds = campaigns.map(c => c.campaign_id);
     const placeholders = campaignIds.map((_, i) => `$${i + 2}`).join(', ');
+    const cutoffParamIndex = campaignIds.length + 2;
     
     const impressionCountsResult = await query(
       `SELECT campaign_id, COUNT(*) as count
        FROM impressions
        WHERE user_id = $1
        AND campaign_id IN (${placeholders})
-       AND timestamp >= $${campaignIds.length + 2}
+       AND timestamp >= $${cutoffParamIndex}
        GROUP BY campaign_id`,
       [user.user_id, ...campaignIds, cutoffTime]
     );
@@ -184,8 +184,12 @@ class BiddingService {
     const maxBid = Math.max(...landscape.map(c => c.bid_amount));
 
     let competitionLevel = 'low';
-    if (landscape.length > 5) competitionLevel = 'medium';
-    if (landscape.length > 10) competitionLevel = 'high';
+    if (landscape.length > 5) {
+      competitionLevel = 'medium';
+    }
+    if (landscape.length > 10) {
+      competitionLevel = 'high';
+    }
 
     return {
       estimated_bid: parseFloat(avgBid.toFixed(2)),
@@ -198,7 +202,7 @@ class BiddingService {
   /**
    * Optimize bid recommendation for an advertiser
    */
-  static getRecommendedBid(targetSegments, targetCTR = 0.02) {
+  static getRecommendedBid(targetSegments, _targetCTR = 0.02) {
     let totalBid = 0;
     let count = 0;
 

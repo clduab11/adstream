@@ -80,7 +80,7 @@ class SegmentationService {
   /**
    * Get all available segments with user counts
    */
-  static getAvailableSegments(minSize = 0) {
+  static async getAvailableSegments(minSize = 0) {
     const sql = `
       SELECT
         segment,
@@ -93,7 +93,8 @@ class SegmentationService {
       ORDER BY user_count DESC
     `;
 
-    const results = query(sql, [minSize]);
+    const result = await query(sql, [minSize]);
+    const results = result.rows || result;
 
     return results.map(row => ({
       segment: row.segment,

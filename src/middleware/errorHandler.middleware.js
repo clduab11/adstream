@@ -68,7 +68,7 @@ function handleDatabaseError(err, req, res) {
 /**
  * Main error handler middleware
  */
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
   // Log all errors
   logger.error({
     message: err.message,

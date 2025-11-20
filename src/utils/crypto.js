@@ -5,9 +5,14 @@ const { v4: uuidv4 } = require('uuid');
 let SECRET_KEY;
 if (!process.env.SECRET_KEY) {
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('SECRET_KEY environment variable must be set in production for secure HMAC signature generation.');
+    throw new Error(
+      'SECRET_KEY environment variable must be set in production for secure HMAC signature generation.'
+    );
   } else {
-    console.warn('WARNING: Using default secret key for HMAC signature generation. Set the SECRET_KEY environment variable to a strong value in production.');
+    console.warn(
+      'WARNING: Using default secret key for HMAC signature generation. ' +
+      'Set the SECRET_KEY environment variable to a strong value in production.'
+    );
     SECRET_KEY = 'default-secret-key-change-in-production';
   }
 } else {

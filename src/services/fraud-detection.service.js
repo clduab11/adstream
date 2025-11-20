@@ -213,7 +213,7 @@ class FraudDetectionService {
    * Check IP-based fraud patterns
    * (Simplified - in production would use IP intelligence service)
    */
-  static checkIpPattern(ipAddress, userId) {
+  static checkIpPattern(_ipAddress, _userId) {
     // Placeholder for IP-based fraud detection
     // Would check for:
     // - Known bot/proxy IPs
