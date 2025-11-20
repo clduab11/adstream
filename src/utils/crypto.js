@@ -1,20 +1,29 @@
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 
-const SECRET_KEY = process.env.SECRET_KEY || 'default-secret-key-change-in-production';
+// Ensure SECRET_KEY is set in production
+let SECRET_KEY;
+if (!process.env.SECRET_KEY) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SECRET_KEY environment variable must be set in production for secure HMAC signature generation.');
+  } else {
+    console.warn('WARNING: Using default secret key for HMAC signature generation. Set the SECRET_KEY environment variable to a strong value in production.');
+    SECRET_KEY = 'default-secret-key-change-in-production';
+  }
+} else {
+  SECRET_KEY = process.env.SECRET_KEY;
+}
 
 /**
  * Generate a unique impression ID with HMAC signature for fraud prevention
- * Format: uuid_signature (signature is first 8 chars of HMAC)
+ * Format: imp_uuid_signature (signature is first 8 chars of HMAC)
  */
 function generateImpressionId() {
   const uuid = uuidv4();
-  const timestamp = Date.now().toString();
-  const data = `${uuid}:${timestamp}`;
 
   const signature = crypto
     .createHmac('sha256', SECRET_KEY)
-    .update(data)
+    .update(uuid)
     .digest('hex')
     .substring(0, 8);
 
@@ -38,7 +47,7 @@ function verifyImpressionId(impressionId) {
 
   // Basic format validation
   const uuid = parts[1];
-  const signature = parts[2];
+  const providedSignature = parts[2];
 
   // UUID format check
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,11 +56,31 @@ function verifyImpressionId(impressionId) {
   }
 
   // Signature length check
-  if (signature.length !== 8) {
+  if (providedSignature.length !== 8) {
     return false;
   }
 
-  return true;
+  // Recompute HMAC signature and verify
+  // Note: We only use UUID for signature since timestamp is not in the final ID format
+  const expectedSignature = crypto
+    .createHmac('sha256', SECRET_KEY)
+    .update(uuid)
+    .digest('hex')
+    .substring(0, 8);
+
+  // Use timing-safe comparison to prevent timing attacks
+  try {
+    const providedBuffer = Buffer.from(providedSignature, 'hex');
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    
+    if (providedBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+    
+    return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+  } catch (error) {
+    return false;
+  }
 }
 
 /**

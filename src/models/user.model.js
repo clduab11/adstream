@@ -8,7 +8,7 @@ class UserModel {
   /**
    * Create a new user
    */
-  static create(userData) {
+  static async create(userData) {
     const userId = userData.user_id || generateUserId();
     const now = new Date().toISOString();
 
@@ -30,14 +30,14 @@ class UserModel {
       now
     ];
 
-    query(sql, params);
+    await query(sql, params);
     return this.findById(userId);
   }
 
   /**
    * Find user by ID
    */
-  static findById(userId) {
+  static async findById(userId) {
     const sql = 'SELECT * FROM users WHERE user_id = $1';
     return queryOne(sql, [userId]);
   }
@@ -45,7 +45,7 @@ class UserModel {
   /**
    * Find user by username
    */
-  static findByUsername(username) {
+  static async findByUsername(username) {
     const sql = 'SELECT * FROM users WHERE username = $1';
     return queryOne(sql, [username]);
   }
@@ -53,7 +53,7 @@ class UserModel {
   /**
    * Update user data
    */
-  static update(userId, updates) {
+  static async update(userId, updates) {
     const allowedFields = [
       'username', 'email', 'segment', 'total_purchases',
       'average_order_value', 'last_purchase_date'
@@ -81,52 +81,55 @@ class UserModel {
       WHERE user_id = $${paramIndex}
     `;
 
-    query(sql, params);
+    await query(sql, params);
     return this.findById(userId);
   }
 
   /**
    * Get users by segment
    */
-  static findBySegment(segment, limit = 100) {
+  static async findBySegment(segment, limit = 100) {
     const sql = `
       SELECT * FROM users
       WHERE segment = $1
       ORDER BY created_at DESC
       LIMIT $2
     `;
-    return query(sql, [segment, limit]);
+    const result = await query(sql, [segment, limit]);
+    return result.rows || result;
   }
 
   /**
    * Get all users with pagination
    */
-  static findAll(offset = 0, limit = 100) {
+  static async findAll(offset = 0, limit = 100) {
     const sql = `
       SELECT * FROM users
       ORDER BY created_at DESC
       LIMIT $1 OFFSET $2
     `;
-    return query(sql, [limit, offset]);
+    const result = await query(sql, [limit, offset]);
+    return result.rows || result;
   }
 
   /**
    * Count users by segment
    */
-  static countBySegment() {
+  static async countBySegment() {
     const sql = `
       SELECT segment, COUNT(*) as count
       FROM users
       GROUP BY segment
       ORDER BY count DESC
     `;
-    return query(sql);
+    const result = await query(sql);
+    return result.rows || result;
   }
 
   /**
    * Delete user
    */
-  static delete(userId) {
+  static async delete(userId) {
     const sql = 'DELETE FROM users WHERE user_id = $1';
     return query(sql, [userId]);
   }
@@ -134,16 +137,16 @@ class UserModel {
   /**
    * Check if user exists
    */
-  static exists(userId) {
+  static async exists(userId) {
     const sql = 'SELECT 1 FROM users WHERE user_id = $1';
-    const result = queryOne(sql, [userId]);
+    const result = await queryOne(sql, [userId]);
     return !!result;
   }
 
   /**
    * Get user purchase statistics
    */
-  static getPurchaseStats(userId) {
+  static async getPurchaseStats(userId) {
     const sql = `
       SELECT
         total_purchases,

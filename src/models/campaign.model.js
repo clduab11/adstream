@@ -9,7 +9,7 @@ class CampaignModel {
   /**
    * Create a new campaign
    */
-  static create(campaignData) {
+  static async create(campaignData) {
     const campaignId = campaignData.campaign_id || generateCampaignId();
 
     const sql = `
@@ -40,16 +40,16 @@ class CampaignModel {
       new Date().toISOString()
     ];
 
-    query(sql, params);
+    await query(sql, params);
     return this.findById(campaignId);
   }
 
   /**
    * Find campaign by ID
    */
-  static findById(campaignId) {
+  static async findById(campaignId) {
     const sql = 'SELECT * FROM campaigns WHERE campaign_id = $1';
-    const campaign = queryOne(sql, [campaignId]);
+    const campaign = await queryOne(sql, [campaignId]);
 
     if (campaign && typeof campaign.target_segments === 'string') {
       campaign.target_segments = JSON.parse(campaign.target_segments);
@@ -61,8 +61,11 @@ class CampaignModel {
   /**
    * Find active campaigns targeting a specific segment
    */
-  static findActiveBySegment(segment) {
+  static async findActiveBySegment(segment) {
     const now = new Date().toISOString();
+
+    // Sanitize segment to prevent SQL injection through LIKE wildcards
+    const sanitizedSegment = segment.replace(/[%_]/g, '\\$&');
 
     const sql = `
       SELECT * FROM campaigns
@@ -78,13 +81,15 @@ class CampaignModel {
       ORDER BY bid_amount DESC
     `;
 
-    const campaigns = query(sql, [
+    const result = await query(sql, [
       CAMPAIGN_STATUS.ACTIVE,
       now,
-      `%"${segment}"%`,
-      `%'${segment}'%`,
-      `%${segment}%`
+      `%"${sanitizedSegment}"%`,
+      `%'${sanitizedSegment}'%`,
+      `%${sanitizedSegment}%`
     ]);
+
+    const campaigns = result.rows || result;
 
     return campaigns.map(campaign => {
       if (typeof campaign.target_segments === 'string') {
@@ -97,7 +102,7 @@ class CampaignModel {
   /**
    * Get all active campaigns
    */
-  static findAllActive() {
+  static async findAllActive() {
     const now = new Date().toISOString();
 
     const sql = `
@@ -109,7 +114,8 @@ class CampaignModel {
       ORDER BY bid_amount DESC
     `;
 
-    const campaigns = query(sql, [CAMPAIGN_STATUS.ACTIVE, now]);
+    const result = await query(sql, [CAMPAIGN_STATUS.ACTIVE, now]);
+    const campaigns = result.rows || result;
 
     return campaigns.map(campaign => {
       if (typeof campaign.target_segments === 'string') {
@@ -122,7 +128,7 @@ class CampaignModel {
   /**
    * Update campaign
    */
-  static update(campaignId, updates) {
+  static async update(campaignId, updates) {
     const allowedFields = [
       'advertiser_name', 'target_segments', 'ad_creative_url',
       'redirect_url', 'bid_amount', 'budget_remaining',
@@ -155,28 +161,29 @@ class CampaignModel {
       WHERE campaign_id = $${paramIndex}
     `;
 
-    query(sql, params);
+    await query(sql, params);
     return this.findById(campaignId);
   }
 
   /**
    * Deduct from campaign budget
    */
-  static deductBudget(campaignId, amount) {
+  static async deductBudget(campaignId, amount) {
     const sql = `
       UPDATE campaigns
       SET budget_remaining = budget_remaining - $1
       WHERE campaign_id = $2 AND budget_remaining >= $1
     `;
 
-    const result = query(sql, [amount, campaignId]);
-    return result.changes > 0;
+    const result = await query(sql, [amount, campaignId]);
+    // Support both SQLite (changes) and PostgreSQL (rowCount)
+    return (result.changes || result.rowCount || 0) > 0;
   }
 
   /**
    * Get campaign statistics
    */
-  static getStats(campaignId) {
+  static async getStats(campaignId) {
     const sql = `
       SELECT
         c.campaign_id,
@@ -209,14 +216,15 @@ class CampaignModel {
   /**
    * Get all campaigns with pagination
    */
-  static findAll(offset = 0, limit = 100) {
+  static async findAll(offset = 0, limit = 100) {
     const sql = `
       SELECT * FROM campaigns
       ORDER BY created_at DESC
       LIMIT $1 OFFSET $2
     `;
 
-    const campaigns = query(sql, [limit, offset]);
+    const result = await query(sql, [limit, offset]);
+    const campaigns = result.rows || result;
 
     return campaigns.map(campaign => {
       if (typeof campaign.target_segments === 'string') {
@@ -229,7 +237,7 @@ class CampaignModel {
   /**
    * Delete campaign
    */
-  static delete(campaignId) {
+  static async delete(campaignId) {
     const sql = 'DELETE FROM campaigns WHERE campaign_id = $1';
     return query(sql, [campaignId]);
   }

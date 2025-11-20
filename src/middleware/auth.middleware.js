@@ -1,11 +1,35 @@
 const { API_ERRORS } = require('../config/constants');
 const logger = require('../utils/logger');
+const { hashApiKey } = require('../utils/crypto');
 
-// In-memory API key store (in production, use database)
-const validApiKeys = new Set([
-  'ak_demo_key_12345', // Demo key for testing
-  'ak_test_advertiser_key'
-]);
+// Get API keys from environment variables
+const getValidApiKeys = () => {
+  const keys = new Set();
+  
+  // Load from environment variable (comma-separated list of keys)
+  const envKeys = process.env.API_KEYS || '';
+  if (envKeys) {
+    envKeys.split(',').forEach(key => {
+      const trimmedKey = key.trim();
+      if (trimmedKey) {
+        keys.add(hashApiKey(trimmedKey));
+      }
+    });
+  }
+  
+  // Add demo keys only in non-production environments
+  if (process.env.NODE_ENV !== 'production') {
+    keys.add(hashApiKey('ak_demo_key_12345'));
+    keys.add(hashApiKey('ak_test_advertiser_key'));
+  } else if (keys.size === 0) {
+    throw new Error('No API keys configured. Set API_KEYS environment variable in production.');
+  }
+  
+  return keys;
+};
+
+// Initialize valid API keys
+const validApiKeys = getValidApiKeys();
 
 /**
  * Authentication middleware
@@ -33,8 +57,9 @@ function authMiddleware(req, res, next) {
     });
   }
 
-  // Validate API key
-  if (!validApiKeys.has(apiKey)) {
+  // Validate API key by comparing hashes
+  const hashedKey = hashApiKey(apiKey);
+  if (!validApiKeys.has(hashedKey)) {
     logger.warn('Authentication failed: Invalid API key', {
       path: req.path,
       ip: req.ip
@@ -46,8 +71,8 @@ function authMiddleware(req, res, next) {
     });
   }
 
-  // Add API key info to request for logging
-  req.apiKey = apiKey;
+  // Add API key info to request for logging (use hash for security)
+  req.apiKey = hashedKey;
   next();
 }
 
@@ -55,21 +80,21 @@ function authMiddleware(req, res, next) {
  * Add a new API key (for testing/admin purposes)
  */
 function addApiKey(key) {
-  validApiKeys.add(key);
+  validApiKeys.add(hashApiKey(key));
 }
 
 /**
  * Remove an API key
  */
 function removeApiKey(key) {
-  validApiKeys.delete(key);
+  validApiKeys.delete(hashApiKey(key));
 }
 
 /**
  * Check if an API key is valid
  */
 function isValidApiKey(key) {
-  return validApiKeys.has(key);
+  return validApiKeys.has(hashApiKey(key));
 }
 
 module.exports = {
