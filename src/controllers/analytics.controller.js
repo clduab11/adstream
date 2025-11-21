@@ -20,7 +20,7 @@ class AnalyticsController {
       const { start_date, end_date } = req.query;
 
       // Validate campaign exists
-      const campaign = CampaignModel.findById(campaign_id);
+      const campaign = await CampaignModel.findById(campaign_id);
       if (!campaign) {
         throw new ApiError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign does not exist');
       }
@@ -31,7 +31,7 @@ class AnalyticsController {
         .toISOString().split('T')[0];
 
       // Get metrics from tracking model
-      const metrics = TrackingModel.getCampaignMetrics(
+      const metrics = await TrackingModel.getCampaignMetrics(
         campaign_id,
         startDate + 'T00:00:00.000Z',
         endDate + 'T23:59:59.999Z'
@@ -83,7 +83,20 @@ class AnalyticsController {
     try {
       const { offset = 0, limit = 50, status } = req.query;
 
-      let campaigns = CampaignModel.findAll(
+      // Get total count for pagination (with status filter if specified)
+      const { query } = require('../config/database');
+      let countSql = 'SELECT COUNT(*) as total FROM campaigns';
+      const countParams = [];
+      
+      if (status) {
+        countSql += ' WHERE status = $1';
+        countParams.push(status);
+      }
+      
+      const countResult = await query(countSql, countParams);
+      const total = countResult.rows ? countResult.rows[0].total : countResult[0].total;
+
+      let campaigns = await CampaignModel.findAll(
         parseInt(offset),
         parseInt(limit)
       );
@@ -93,25 +106,27 @@ class AnalyticsController {
         campaigns = campaigns.filter(c => c.status === status);
       }
 
-      // Add basic stats to each campaign
-      const campaignsWithStats = campaigns.map(campaign => {
-        const stats = CampaignModel.getStats(campaign.campaign_id);
-        return {
-          ...campaign,
-          impressions: stats?.impressions || 0,
-          clicks: stats?.clicks || 0,
-          ctr: stats?.impressions > 0
-            ? parseFloat(((stats.clicks / stats.impressions) * 100).toFixed(2))
-            : 0
-        };
-      });
+      // Add basic stats to each campaign (fix N+1 by using Promise.all)
+      const campaignsWithStats = await Promise.all(
+        campaigns.map(async campaign => {
+          const stats = await CampaignModel.getStats(campaign.campaign_id);
+          return {
+            ...campaign,
+            impressions: stats?.impressions || 0,
+            clicks: stats?.clicks || 0,
+            ctr: stats?.impressions > 0
+              ? parseFloat(((stats.clicks / stats.impressions) * 100).toFixed(2))
+              : 0
+          };
+        })
+      );
 
       res.json({
         campaigns: campaignsWithStats,
         pagination: {
           offset: parseInt(offset),
           limit: parseInt(limit),
-          total: campaignsWithStats.length
+          total: Number(total)
         }
       });
     } catch (error) {
@@ -127,12 +142,12 @@ class AnalyticsController {
     try {
       const { campaign_id } = req.params;
 
-      const campaign = CampaignModel.findById(campaign_id);
+      const campaign = await CampaignModel.findById(campaign_id);
       if (!campaign) {
         throw new ApiError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign does not exist');
       }
 
-      const stats = CampaignModel.getStats(campaign_id);
+      const stats = await CampaignModel.getStats(campaign_id);
 
       res.json({
         ...campaign,
@@ -169,10 +184,14 @@ class AnalyticsController {
 
       // Validate required fields
       if (!advertiser_name || !ad_creative_url || !bid_amount || !budget_remaining) {
-        throw new ApiError(400, 'MISSING_FIELDS', 'Required fields: advertiser_name, ad_creative_url, bid_amount, budget_remaining');
+        throw new ApiError(
+          400,
+          'MISSING_FIELDS',
+          'Required fields: advertiser_name, ad_creative_url, bid_amount, budget_remaining'
+        );
       }
 
-      const campaign = CampaignModel.create({
+      const campaign = await CampaignModel.create({
         advertiser_name,
         target_segments: target_segments || [],
         ad_creative_url,
@@ -200,12 +219,12 @@ class AnalyticsController {
     try {
       const { campaign_id } = req.params;
 
-      const campaign = CampaignModel.findById(campaign_id);
+      const campaign = await CampaignModel.findById(campaign_id);
       if (!campaign) {
         throw new ApiError(404, 'CAMPAIGN_NOT_FOUND', 'Campaign does not exist');
       }
 
-      const updated = CampaignModel.update(campaign_id, req.body);
+      const updated = await CampaignModel.update(campaign_id, req.body);
 
       logger.info('Campaign updated', { campaign_id });
 
@@ -223,7 +242,7 @@ class AnalyticsController {
     try {
       const { min_size = 0 } = req.query;
 
-      const segments = SegmentationService.getAvailableSegments(parseInt(min_size));
+      const segments = await SegmentationService.getAvailableSegments(parseInt(min_size));
 
       res.json({
         segments,
@@ -277,8 +296,8 @@ class AnalyticsController {
    */
   static async getPlatformStats(req, res, next) {
     try {
-      const stats = TrackingModel.getPlatformStats();
-      const userCount = UserModel.countBySegment();
+      const stats = await TrackingModel.getPlatformStats();
+      const userCount = await UserModel.countBySegment();
 
       res.json({
         ...stats,

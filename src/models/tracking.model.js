@@ -8,7 +8,7 @@ class TrackingModel {
   /**
    * Record a new impression
    */
-  static createImpression(data) {
+  static async createImpression(data) {
     const impressionId = data.impression_id || generateImpressionId();
     const timestamp = new Date().toISOString();
 
@@ -28,14 +28,14 @@ class TrackingModel {
       data.placement || 'homepage_banner'
     ];
 
-    query(sql, params);
+    await query(sql, params);
     return { impression_id: impressionId, timestamp };
   }
 
   /**
    * Find impression by ID
    */
-  static findImpressionById(impressionId) {
+  static async findImpressionById(impressionId) {
     const sql = 'SELECT * FROM impressions WHERE impression_id = $1';
     return queryOne(sql, [impressionId]);
   }
@@ -43,16 +43,16 @@ class TrackingModel {
   /**
    * Check if impression exists
    */
-  static impressionExists(impressionId) {
+  static async impressionExists(impressionId) {
     const sql = 'SELECT 1 FROM impressions WHERE impression_id = $1';
-    const result = queryOne(sql, [impressionId]);
+    const result = await queryOne(sql, [impressionId]);
     return !!result;
   }
 
   /**
    * Record a click
    */
-  static createClick(data) {
+  static async createClick(data) {
     const clickId = generateClickId();
     const timestamp = new Date().toISOString();
 
@@ -72,23 +72,23 @@ class TrackingModel {
       data.redirect_url || null
     ];
 
-    query(sql, params);
+    await query(sql, params);
     return { click_id: clickId, timestamp };
   }
 
   /**
    * Check if click already recorded for impression
    */
-  static clickExistsForImpression(impressionId) {
+  static async clickExistsForImpression(impressionId) {
     const sql = 'SELECT 1 FROM clicks WHERE impression_id = $1';
-    const result = queryOne(sql, [impressionId]);
+    const result = await queryOne(sql, [impressionId]);
     return !!result;
   }
 
   /**
    * Get impression count for user within time window (for frequency capping)
    */
-  static getUserImpressionCount(userId, campaignId, hoursWindow = 24) {
+  static async getUserImpressionCount(userId, campaignId, hoursWindow = 24) {
     const cutoffTime = new Date(Date.now() - hoursWindow * 60 * 60 * 1000).toISOString();
 
     const sql = `
@@ -97,14 +97,15 @@ class TrackingModel {
       WHERE user_id = $1 AND campaign_id = $2 AND timestamp >= $3
     `;
 
-    const result = queryOne(sql, [userId, campaignId, cutoffTime]);
-    return result ? result.count : 0;
+    const result = await queryOne(sql, [userId, campaignId, cutoffTime]);
+    // Coerce COUNT(*) result to number for arithmetic operations
+    return result ? Number(result.count) : 0;
   }
 
   /**
    * Get campaign metrics for a date range
    */
-  static getCampaignMetrics(campaignId, startDate, endDate) {
+  static async getCampaignMetrics(campaignId, startDate, endDate) {
     const impressionsSql = `
       SELECT
         COUNT(*) as impressions,
@@ -139,9 +140,12 @@ class TrackingModel {
       GROUP BY u.segment
     `;
 
-    const impressionDetails = query(impressionsSql, [campaignId, startDate, endDate]);
-    const clickResult = queryOne(clicksSql, [campaignId, startDate, endDate]);
-    const segmentData = query(impressionsBySegmentSql, [campaignId, startDate, endDate]);
+    const impressionDetailsResult = await query(impressionsSql, [campaignId, startDate, endDate]);
+    const clickResult = await queryOne(clicksSql, [campaignId, startDate, endDate]);
+    const segmentDataResult = await query(impressionsBySegmentSql, [campaignId, startDate, endDate]);
+
+    const impressionDetails = impressionDetailsResult.rows || impressionDetailsResult;
+    const segmentData = segmentDataResult.rows || segmentDataResult;
 
     // Aggregate totals
     let totalImpressions = 0;
@@ -149,20 +153,22 @@ class TrackingModel {
     const byPlacement = {};
 
     for (const row of impressionDetails) {
-      totalImpressions += row.impressions;
+      // Coerce COUNT(*) to number
+      const impressions = Number(row.impressions);
+      totalImpressions += impressions;
 
       if (!byDevice[row.device_type]) {
         byDevice[row.device_type] = { impressions: 0 };
       }
-      byDevice[row.device_type].impressions += row.impressions;
+      byDevice[row.device_type].impressions += impressions;
 
       if (!byPlacement[row.placement]) {
         byPlacement[row.placement] = { impressions: 0 };
       }
-      byPlacement[row.placement].impressions += row.impressions;
+      byPlacement[row.placement].impressions += impressions;
     }
 
-    const totalClicks = clickResult ? clickResult.clicks : 0;
+    const totalClicks = clickResult ? Number(clickResult.clicks) : 0;
     const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
 
     return {
@@ -171,10 +177,10 @@ class TrackingModel {
       ctr: parseFloat(ctr.toFixed(2)),
       by_segment: segmentData.map(row => ({
         segment: row.segment,
-        impressions: row.impressions,
-        clicks: row.clicks,
-        ctr: row.impressions > 0
-          ? parseFloat(((row.clicks / row.impressions) * 100).toFixed(2))
+        impressions: Number(row.impressions),
+        clicks: Number(row.clicks),
+        ctr: Number(row.impressions) > 0
+          ? parseFloat(((Number(row.clicks) / Number(row.impressions)) * 100).toFixed(2))
           : 0
       })),
       by_device: Object.entries(byDevice).map(([device, data]) => ({
@@ -191,55 +197,58 @@ class TrackingModel {
   /**
    * Get recent impressions for a campaign
    */
-  static getRecentImpressions(campaignId, limit = 100) {
+  static async getRecentImpressions(campaignId, limit = 100) {
     const sql = `
       SELECT * FROM impressions
       WHERE campaign_id = $1
       ORDER BY timestamp DESC
       LIMIT $2
     `;
-    return query(sql, [campaignId, limit]);
+    const result = await query(sql, [campaignId, limit]);
+    return result.rows || result;
   }
 
   /**
    * Get recent clicks for a campaign
    */
-  static getRecentClicks(campaignId, limit = 100) {
+  static async getRecentClicks(campaignId, limit = 100) {
     const sql = `
       SELECT * FROM clicks
       WHERE campaign_id = $1
       ORDER BY timestamp DESC
       LIMIT $2
     `;
-    return query(sql, [campaignId, limit]);
+    const result = await query(sql, [campaignId, limit]);
+    return result.rows || result;
   }
 
   /**
    * Delete old tracking data (for maintenance)
    */
-  static deleteOldData(daysToKeep = 90) {
+  static async deleteOldData(daysToKeep = 90) {
     const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000).toISOString();
 
-    const deleteImpressions = query(
+    const deleteImpressions = await query(
       'DELETE FROM impressions WHERE timestamp < $1',
       [cutoffDate]
     );
 
-    const deleteClicks = query(
+    const deleteClicks = await query(
       'DELETE FROM clicks WHERE timestamp < $1',
       [cutoffDate]
     );
 
+    // Support both SQLite (changes) and PostgreSQL (rowCount)
     return {
-      impressions_deleted: deleteImpressions.changes || 0,
-      clicks_deleted: deleteClicks.changes || 0
+      impressions_deleted: deleteImpressions.changes || deleteImpressions.rowCount || 0,
+      clicks_deleted: deleteClicks.changes || deleteClicks.rowCount || 0
     };
   }
 
   /**
    * Get overall platform statistics
    */
-  static getPlatformStats() {
+  static async getPlatformStats() {
     const sql = `
       SELECT
         (SELECT COUNT(*) FROM impressions) as total_impressions,

@@ -6,9 +6,12 @@ let dbType = process.env.DB_TYPE || 'sqlite';
 
 /**
  * Initialize database connection based on environment configuration
+ * Returns a Promise for consistency across database types
  */
-function initDatabase() {
-  if (db) return db;
+async function initDatabase() {
+  if (db) {
+    return Promise.resolve(db);
+  }
 
   if (dbType === 'sqlite') {
     const Database = require('better-sqlite3');
@@ -32,17 +35,23 @@ function initDatabase() {
       });
     }
 
-    return db;
+    return Promise.resolve(db);
   } else if (dbType === 'postgres') {
     const { Pool } = require('pg');
 
     db = new Pool({
       connectionString: process.env.DATABASE_URL,
       min: parseInt(process.env.DB_POOL_MIN) || 5,
-      max: parseInt(process.env.DB_POOL_MAX) || 20,
+      max: parseInt(process.env.DB_POOL_MAX) || 20
     });
 
-    return db;
+    // Test connection for PostgreSQL
+    try {
+      await db.query('SELECT 1');
+      return db;
+    } catch (error) {
+      throw new Error(`Failed to connect to PostgreSQL: ${error.message}`);
+    }
   }
 
   throw new Error(`Unsupported database type: ${dbType}`);
@@ -75,6 +84,7 @@ function closeDatabase() {
 /**
  * Execute a query with parameters
  * Abstracts differences between SQLite and PostgreSQL
+ * Returns a Promise for both database types
  */
 function query(sql, params = []) {
   const database = getDatabase();
@@ -83,11 +93,16 @@ function query(sql, params = []) {
     // Convert PostgreSQL-style $1, $2 to SQLite ? placeholders
     const sqliteSql = sql.replace(/\$(\d+)/g, '?');
 
-    if (sql.trim().toUpperCase().startsWith('SELECT')) {
-      return database.prepare(sqliteSql).all(...params);
-    } else {
-      return database.prepare(sqliteSql).run(...params);
-    }
+    return Promise.resolve().then(() => {
+      if (sql.trim().toUpperCase().startsWith('SELECT')) {
+        const rows = database.prepare(sqliteSql).all(...params);
+        return { rows };
+      } else {
+        const result = database.prepare(sqliteSql).run(...params);
+        // Normalize result format: SQLite uses 'changes', PostgreSQL uses 'rowCount'
+        return { changes: result.changes, rowCount: result.changes };
+      }
+    });
   } else {
     return database.query(sql, params);
   }
@@ -95,13 +110,14 @@ function query(sql, params = []) {
 
 /**
  * Execute a query and return a single row
+ * Returns a Promise for both database types
  */
 function queryOne(sql, params = []) {
   const database = getDatabase();
 
   if (dbType === 'sqlite') {
     const sqliteSql = sql.replace(/\$(\d+)/g, '?');
-    return database.prepare(sqliteSql).get(...params);
+    return Promise.resolve(database.prepare(sqliteSql).get(...params));
   } else {
     return database.query(sql, params).then(result => result.rows[0]);
   }
@@ -123,7 +139,9 @@ function transaction(callback) {
           return client.query('COMMIT').then(() => result);
         })
         .catch(err => {
-          return client.query('ROLLBACK').then(() => { throw err; });
+          return client.query('ROLLBACK').then(() => {
+            throw err;
+          });
         })
         .finally(() => client.release());
     });

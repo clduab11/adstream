@@ -1,4 +1,4 @@
-const { query, queryOne } = require('../config/database');
+const { queryOne } = require('../config/database');
 const { verifyImpressionId } = require('../utils/crypto');
 const logger = require('../utils/logger');
 
@@ -213,7 +213,7 @@ class FraudDetectionService {
    * Check IP-based fraud patterns
    * (Simplified - in production would use IP intelligence service)
    */
-  static checkIpPattern(ipAddress, userId) {
+  static checkIpPattern(_ipAddress, _userId) {
     // Placeholder for IP-based fraud detection
     // Would check for:
     // - Known bot/proxy IPs
@@ -225,7 +225,10 @@ class FraudDetectionService {
   /**
    * Analyze user for suspicious behavior patterns
    */
-  static analyzeUserBehavior(userId) {
+  static async analyzeUserBehavior(userId) {
+    // Calculate cutoff date in JavaScript (database-agnostic)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
     const sql = `
       SELECT
         COUNT(DISTINCT i.impression_id) as impressions,
@@ -238,10 +241,10 @@ class FraudDetectionService {
       FROM impressions i
       LEFT JOIN clicks c ON i.impression_id = c.impression_id
       WHERE i.user_id = $1
-        AND i.timestamp >= datetime('now', '-7 days')
+        AND i.timestamp >= $2
     `;
 
-    const result = queryOne(sql, [userId]);
+    const result = await queryOne(sql, [userId, sevenDaysAgo]);
 
     if (!result) {
       return { suspicious: false };
