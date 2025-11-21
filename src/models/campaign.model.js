@@ -73,17 +73,18 @@ class CampaignModel {
       WHERE status = $1
         AND budget_remaining > 0
         AND start_date <= $2
-        AND end_date >= $2
+        AND end_date >= $3
         AND (
-          target_segments LIKE $3 ESCAPE '\\'
-          OR target_segments LIKE $4 ESCAPE '\\'
+          target_segments LIKE $4 ESCAPE '\\'
           OR target_segments LIKE $5 ESCAPE '\\'
+          OR target_segments LIKE $6 ESCAPE '\\'
         )
       ORDER BY bid_amount DESC
     `;
 
     const result = await query(sql, [
       CAMPAIGN_STATUS.ACTIVE,
+      now,
       now,
       `%"${sanitizedSegment}"%`,
       `%'${sanitizedSegment}'%`,
@@ -173,10 +174,10 @@ class CampaignModel {
     const sql = `
       UPDATE campaigns
       SET budget_remaining = budget_remaining - $1
-      WHERE campaign_id = $2 AND budget_remaining >= $1
+      WHERE campaign_id = $2 AND budget_remaining >= $3
     `;
 
-    const result = await query(sql, [amount, campaignId]);
+    const result = await query(sql, [amount, campaignId, amount]);
     // Support both SQLite (changes) and PostgreSQL (rowCount)
     return (result.changes || result.rowCount || 0) > 0;
   }

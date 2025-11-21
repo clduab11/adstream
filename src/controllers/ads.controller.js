@@ -171,7 +171,7 @@ class AdsController {
       const { user_id } = req.body;
 
       // Validate click
-      const validation = FraudDetectionService.validateClick(impression_id, user_id);
+      const validation = await FraudDetectionService.validateClick(impression_id, user_id);
 
       if (!validation.valid) {
         logger.warn('Invalid click attempt', {
