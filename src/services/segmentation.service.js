@@ -126,7 +126,7 @@ class SegmentationService {
   /**
    * Get users matching multiple segment criteria
    */
-  static getUsersByMultipleSegments(segments) {
+  static async getUsersByMultipleSegments(segments) {
     if (!segments || segments.length === 0) {
       return [];
     }
@@ -138,7 +138,8 @@ class SegmentationService {
       ORDER BY total_purchases DESC
     `;
 
-    return query(sql, segments);
+    const result = await query(sql, segments);
+    return result.rows || result;
   }
 
   /**
@@ -155,7 +156,7 @@ class SegmentationService {
   /**
    * Get segment performance metrics
    */
-  static getSegmentPerformance() {
+  static async getSegmentPerformance() {
     const sql = `
       SELECT
         u.segment,
@@ -174,7 +175,8 @@ class SegmentationService {
       ORDER BY ctr DESC
     `;
 
-    const results = query(sql);
+    const result = await query(sql);
+    const results = result.rows || result;
 
     return results.map(row => ({
       ...row,

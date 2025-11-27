@@ -94,7 +94,7 @@ function errorHandler(err, req, res, _next) {
   }
 
   // Handle database errors
-  if (err.code && (err.code.startsWith('SQLITE_') || err.code.match(/^\d{5}$/))) {
+  if (err.code && typeof err.code === 'string' && (err.code.startsWith('SQLITE_') || err.code.match(/^\d{5}$/))) {
     return handleDatabaseError(err, req, res);
   }
 

@@ -18,14 +18,16 @@ const logger = require('./src/utils/logger');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize database
-try {
-  initDatabase();
-  logger.info('Database initialized successfully');
-} catch (error) {
-  logger.error('Failed to initialize database', { error: error.message });
-  process.exit(1);
-}
+// Initialize database (async IIFE to properly await)
+(async () => {
+  try {
+    await initDatabase();
+    logger.info('Database initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize database', { error: error.message });
+    process.exit(1);
+  }
+})();
 
 // Security middleware
 app.use(helmet());

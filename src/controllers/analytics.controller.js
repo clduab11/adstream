@@ -259,7 +259,7 @@ class AnalyticsController {
    */
   static async getSegmentPerformance(req, res, next) {
     try {
-      const performance = SegmentationService.getSegmentPerformance();
+      const performance = await SegmentationService.getSegmentPerformance();
 
       res.json({
         segments: performance
@@ -277,8 +277,8 @@ class AnalyticsController {
     try {
       const { segment } = req.params;
 
-      const landscape = BiddingService.getBidLandscape(segment);
-      const estimate = BiddingService.estimateWinningBid(segment);
+      const landscape = await BiddingService.getBidLandscape(segment);
+      const estimate = await BiddingService.estimateWinningBid(segment);
 
       res.json({
         segment,
