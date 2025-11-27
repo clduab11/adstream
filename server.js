@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 
-const { initDatabase } = require('./src/config/database');
+const { initDatabase, closeDatabase } = require('./src/config/database');
 const { authMiddleware } = require('./src/middleware/auth.middleware');
 const { generalLimiter } = require('./src/middleware/rateLimit.middleware');
 const {
@@ -17,17 +17,6 @@ const logger = require('./src/utils/logger');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Initialize database (async IIFE to properly await)
-(async () => {
-  try {
-    await initDatabase();
-    logger.info('Database initialized successfully');
-  } catch (error) {
-    logger.error('Failed to initialize database', { error: error.message });
-    process.exit(1);
-  }
-})();
 
 // Security middleware
 app.use(helmet());
@@ -93,18 +82,29 @@ app.use(notFoundHandler);
 // Error handler
 app.use(errorHandler);
 
-// Start server
-const server = app.listen(PORT, () => {
-  logger.info(`ADSTREAM server started`, {
-    port: PORT,
-    environment: process.env.NODE_ENV || 'development',
-    db_type: process.env.DB_TYPE || 'sqlite'
-  });
+// Server instance - initialized in startServer()
+let server;
 
-  const portStr = String(PORT);
-  const envStr = (process.env.NODE_ENV || 'development');
-  
-  console.log(`
+/**
+ * Initialize database and start the server
+ * Ensures database is ready before accepting requests
+ */
+async function startServer() {
+  try {
+    await initDatabase();
+    logger.info('Database initialized successfully');
+    
+    server = app.listen(PORT, () => {
+      logger.info(`ADSTREAM server started`, {
+        port: PORT,
+        environment: process.env.NODE_ENV || 'development',
+        db_type: process.env.DB_TYPE || 'sqlite'
+      });
+
+      const portStr = String(PORT);
+      const envStr = (process.env.NODE_ENV || 'development');
+      
+      console.log(`
   ╔═══════════════════════════════════════════════╗
   ║                                               ║
   ║   ADSTREAM - Retail Media Network Server      ║
@@ -116,28 +116,32 @@ const server = app.listen(PORT, () => {
   ║   Health:   http://localhost:${portStr}/health${' '.repeat(Math.max(0, 15 - portStr.length))}║
   ║                                               ║
   ╚═══════════════════════════════════════════════╝
-  `);
-});
+      `);
+    });
+  } catch (error) {
+    logger.error('Failed to initialize database', { error: error.message });
+    process.exit(1);
+  }
+}
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    const { closeDatabase } = require('./src/config/database');
-    closeDatabase();
-    logger.info('Server closed');
+// Graceful shutdown handler
+function gracefulShutdown(signal) {
+  logger.info(`${signal} received, shutting down gracefully`);
+  if (server) {
+    server.close(() => {
+      closeDatabase();
+      logger.info('Server closed');
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
-});
+  }
+}
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    const { closeDatabase } = require('./src/config/database');
-    closeDatabase();
-    logger.info('Server closed');
-    process.exit(0);
-  });
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Start the server
+startServer();
 
 module.exports = app;
