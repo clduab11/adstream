@@ -175,8 +175,8 @@ class BiddingService {
   /**
    * Estimate winning bid for a segment
    */
-  static estimateWinningBid(segment) {
-    const landscape = this.getBidLandscape(segment);
+  static async estimateWinningBid(segment) {
+    const landscape = await this.getBidLandscape(segment);
 
     if (landscape.length === 0) {
       return { estimated_bid: 0, competition_level: 'none' };
@@ -204,12 +204,12 @@ class BiddingService {
   /**
    * Optimize bid recommendation for an advertiser
    */
-  static getRecommendedBid(targetSegments, _targetCTR = 0.02) {
+  static async getRecommendedBid(targetSegments, _targetCTR = 0.02) {
     let totalBid = 0;
     let count = 0;
 
     for (const segment of targetSegments) {
-      const estimate = this.estimateWinningBid(segment);
+      const estimate = await this.estimateWinningBid(segment);
       if (estimate.active_campaigns > 0) {
         totalBid += estimate.max_bid * 1.1; // Recommend 10% above max to win
         count++;
