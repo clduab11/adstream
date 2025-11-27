@@ -42,7 +42,7 @@ class FraudDetectionService {
   /**
    * Validate a click event
    */
-  static validateClick(impressionId, userId) {
+  static async validateClick(impressionId, userId) {
     // Check impression ID format
     if (!verifyImpressionId(impressionId)) {
       return {
@@ -53,7 +53,7 @@ class FraudDetectionService {
     }
 
     // Check if impression exists
-    const impression = queryOne(
+    const impression = await queryOne(
       'SELECT * FROM impressions WHERE impression_id = $1',
       [impressionId]
     );
@@ -114,7 +114,7 @@ class FraudDetectionService {
     }
 
     // Check for rapid clicking patterns
-    const rapidClickCheck = this.checkRapidClicking(userId);
+    const rapidClickCheck = await this.checkRapidClicking(userId);
     if (!rapidClickCheck.valid) {
       return rapidClickCheck;
     }
@@ -128,10 +128,10 @@ class FraudDetectionService {
   /**
    * Check for rapid clicking patterns (bot detection)
    */
-  static checkRapidClicking(userId, windowMinutes = 1, maxClicks = 10) {
+  static async checkRapidClicking(userId, windowMinutes = 1, maxClicks = 10) {
     const cutoffTime = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
 
-    const result = queryOne(
+    const result = await queryOne(
       `SELECT COUNT(*) as click_count
        FROM clicks
        WHERE user_id = $1 AND timestamp >= $2`,
